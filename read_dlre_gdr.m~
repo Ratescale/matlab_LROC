@@ -28,7 +28,7 @@ lines = str2double(lbl.uncompressed_file.image.lines);
 
 % Find out the precision based on passing, in this case, the value
 % associated with the PDS keyword 'SAMPLE_BITS'.
-[precision, ~] = get_precision(lbl.uncompressed_file.image.sample_bits);
+[precision, pixel_bytes] = get_precision(lbl.uncompressed_file.image.sample_bits);
 
 % Find out what byte-ordering the data is. The keyword SAMPLE_TYPE tells us
 % this. For HRSC it's usually MSB_INTEGER, which is big endian.
@@ -53,24 +53,50 @@ offset = str2double(lbl.uncompressed_file.image.offset);
 core = NaN(size(dn));
 core(mask) = (double(dn(mask)) * scaling_factor) + offset;
 
-center_lat = str2double(strtok(lbl.image_map_projection.center_latitude, ' '));
+% %-----LAT LON-----
+% 
+% switch lower(strrep(lbl.image_map_projection.map_projection_type, '"',''))
+%     case 'simple cylindrical'
+%         
+%         % Lat and lon have units after numbers, e.g. '<deg>'
+%         minlon = str2double(strrep(lbl.image_map_projection.westernmost_longitude, ' <deg>', ''));
+%         maxlon = str2double(strrep(lbl.image_map_projection.easternmost_longitude, ' <deg>', ''));
+%         
+%         minlat = str2double(strrep(lbl.image_map_projection.minimum_latitude, ' <deg>', ''));
+%         maxlat = str2double(strrep(lbl.image_map_projection.maximum_latitude, ' <deg>', ''));
+%         
+%         % Degrees per pixel in lat and lon.
+%         dlat = (maxlat-minlat)/(lines-1);
+%         dlon = (maxlon-minlon)/(samples-1);
+%         % lat/lon vectors.
+%         lat = maxlat:-1*dlat:minlat;
+%         lon = minlon:dlon:maxlon;
+%         
+%     case 'polar stereographic'
+%         % TODO figure out latlon grids for polar stereographic
+%         
+%         % Is it North or South?
+%         lat = NaN;
+%         lon = NaN;
+%         warning('lat and lon grids not yet readable for polar stereographic')
+% end
+
 
 %-----MAP COORDINATES-----
 switch lower(strrep(lbl.image_map_projection.map_projection_type, '"',''))
     case 'simple cylindrical'
         
-        % Remove units.
-        res = str2double(strtok(lbl.image_map_projection.map_resolution, ' '));
+        res = str2double(strrep(lbl.image_map_projection.map_resolution, ' <pix/degree>', ''));
         
         % Lat and lon have units after numbers, e.g. '<deg>'
-        center_lon = str2double(strtok(lbl.image_map_projection.center_longitude, ' '));
+        center_lon = str2double(strrep(lbl.image_map_projection.center_longitude, ' <deg>', ''));
 
         [lon, lat] = meshgrid(1:samples, 1:lines);
         lon = single(lon);
         lat = single(lat);
         
-        spo = str2double(strtok(lbl.image_map_projection.sample_projection_offset, ' '));
-        lpo = str2double(strtok(lbl.image_map_projection.line_projection_offset, ' '));
+        spo = str2double(strrep(lbl.image_map_projection.sample_projection_offset, ' <pix>', ''));
+        lpo = str2double(strrep(lbl.image_map_projection.line_projection_offset, ' <pix>', ''));
         lon = center_lon + (lon - spo - 1)./ res;
         lat = center_lat - (lat - lpo - 1)./ res;
 
@@ -79,7 +105,7 @@ switch lower(strrep(lbl.image_map_projection.map_projection_type, '"',''))
         [psx, psy] = meshgrid(1:samples, 1:lines);
         psx = single(psx);
         psy = single(psy);
-        map_scale = str2double(strtok(lbl.image_map_projection.map_scale, ' '));
+        map_scale = str2double(strrep(lbl.image_map_projection.map_scale, ' <m/pix>', ''));
         
         % Save some memory, move down rows.
         psx = (psx - samples/2 - 0.5).*map_scale;
